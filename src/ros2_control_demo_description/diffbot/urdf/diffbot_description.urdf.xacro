@@ -1,0 +1,145 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <xacro:macro name="diffbot" params="prefix">
+
+  <!-- Constants for robot dimensions -->
+  <xacro:property name="PI" value="3.1415926535897931"/>
+  <xacro:property name="base_mass" value="0.3" /> <!-- arbitrary value for base mass -->
+  <xacro:property name="base_width" value="0.2513" />
+  <xacro:property name="base_length" value="0.2" />
+  <xacro:property name="base_height" value="0.005" />
+  <xacro:property name="wheel_mass" value="0.3" /> <!-- arbitrary value for wheel mass -->
+  <xacro:property name="wheel_len" value="0.029" />
+  <xacro:property name="wheel_radius" value="0.065" />
+  <xacro:property name="caster_wheel_mass" value="0.1" /> <!-- arbitrary value for caster wheel mass -->
+  <xacro:property name="caster_wheel_radius" value="0.015" />
+
+  <!-- Base Link -->
+  <link name="${prefix}base_link">
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${base_width} ${base_length} ${base_height}"/>
+      </geometry>
+    </collision>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${base_width} ${base_length} ${base_height}"/>
+      </geometry>
+      <material name="orange"/>
+    </visual>
+  </link>
+
+  <!-- rear left wheel Link -->
+  <link name="${prefix}rear_left_wheel">
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+      </geometry>
+    </collision>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <!-- rear right wheel Link -->
+  <link name="${prefix}rear_right_wheel">
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+      </geometry>
+    </collision>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <!-- front left wheel Link -->
+  <link name="${prefix}front_left_wheel">
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+      </geometry>
+    </collision>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <!-- front right wheel Link -->
+  <link name="${prefix}front_right_wheel">
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+      </geometry>
+    </collision>
+
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <cylinder length="${wheel_len}" radius="${wheel_radius}"/>
+      </geometry>
+      <material name="black"/>
+    </visual>
+  </link>
+
+  <!-- rear left wheel joint-->
+  <joint name="${prefix}rear_left_wheel_joint" type="continuous">
+    <parent link="${prefix}base_link"/>
+    <child link="${prefix}rear_left_wheel"/>
+    <origin xyz="-0.08355 0.136701 -0.051657" rpy="${-PI/2} 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="100" velocity="1.0"/>
+  </joint>
+
+  <!-- rear right wheel joint-->
+  <joint name="${prefix}rear_right_wheel_joint" type="continuous">
+    <parent link="${prefix}base_link"/>
+    <child link="${prefix}rear_right_wheel"/>
+    <origin xyz="-0.08355 -0.136701 -0.051657" rpy="${PI/2} 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="100" velocity="1.0"/>
+  </joint>
+
+  <!-- front left wheel joint-->
+  <joint name="${prefix}front_left_wheel_joint" type="continuous">
+    <parent link="${prefix}base_link"/>
+    <child link="${prefix}front_left_wheel"/>
+    <origin xyz="0.07145 0.136701 -0.051657" rpy="${-PI/2} 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="100" velocity="1.0"/>
+  </joint>
+
+  <!-- front left wheel joint-->
+  <joint name="${prefix}front_right_wheel_joint" type="continuous">
+    <parent link="${prefix}base_link"/>
+    <child link="${prefix}front_right_wheel"/>
+    <origin xyz="0.07145 -0.136701 -0.051657" rpy="${PI/2} 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="100" velocity="1.0"/>
+  </joint>
+  </xacro:macro>
+
+</robot>
