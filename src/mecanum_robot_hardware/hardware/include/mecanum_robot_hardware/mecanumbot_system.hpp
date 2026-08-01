@@ -19,6 +19,13 @@
 #include <string>
 #include <vector>
 
+#include <fcntl.h>
+#include <unistd.h>
+#include <termios.h>
+
+#include <cstring>
+#include <cstdint>
+
 #include "hardware_interface/handle.hpp"
 #include "hardware_interface/hardware_info.hpp"
 #include "hardware_interface/system_interface.hpp"
@@ -55,10 +62,50 @@ public:
   hardware_interface::return_type write(
     const rclcpp::Time & time, const rclcpp::Duration & period) override;
 
+  
+
 private:
   // Parameters for the DiffBot simulation
   double hw_start_sec_;
   double hw_stop_sec_;
+  
+  int serialDevice; 
+
+  const uint8_t HEADER1 = 0xAA;
+  const uint8_t HEADER2 = 0x55;
+
+  struct SerialPacket {
+    float set_speed_A;
+    float set_speed_B;
+    uint8_t checksum;
+  };
+
+  SerialPacket c;
+  uint8_t send_buffer[11];
+
+  enum class RxState {
+    WAIT_HEADER1,
+    WAIT_HEADER2,
+    READ_PAYLOAD
+  };
+  
+  
+
+  struct __attribute__((packed)) feedback {
+    float left_velocity;
+    float right_velocity;
+    float left_position;
+    float right_position;
+  };
+
+  RxState rx_state_{RxState::WAIT_HEADER1};
+  std::size_t rx_index_{0};
+  std::array<uint8_t, sizeof(feedback)> rx_buffer_;
+
+  feedback feedback_;
+
+
+  uint8_t checksum(const uint8_t *data, size_t len);
 };
 
 }  // namespace mecanum_robot_hardware

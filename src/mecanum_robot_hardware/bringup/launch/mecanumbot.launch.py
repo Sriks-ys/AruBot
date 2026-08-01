@@ -39,7 +39,7 @@ def generate_launch_description():
                 package="controller_manager",
                 executable="ros2_control_node",
                 name="controller_manager",
-                parameters=[{"update_rate": 10}],
+                parameters=[{"update_rate": 20}],
                 output="both",
             ),
             # robot_state_publisher with robot_description from xacro
@@ -64,19 +64,19 @@ def generate_launch_description():
                     }
                 ],
             ),
-            Node(
-                package="rviz2",
-                executable="rviz2",
-                name="rviz2",
-                output="log",
-                arguments=[
-                    "-d",
-                    PathSubstitution(FindPackageShare("ros2_control_demo_description"))
-                    / "diffbot/rviz"
-                    / "diffbot.rviz",
-                ],
-                condition=IfCondition(LaunchConfiguration("gui")),
-            ),
+            # Node(
+            #     package="rviz2",
+            #     executable="rviz2",
+            #     name="rviz2",
+            #     output="log",
+            #     arguments=[
+            #         "-d",
+            #         PathSubstitution(FindPackageShare("ros2_control_demo_description"))
+            #         / "diffbot/rviz"
+            #         / "diffbot.rviz",
+            #     ],
+            #     condition=IfCondition(LaunchConfiguration("gui")),
+            # ),
             Node(
                 package="controller_manager",
                 executable="spawner",
