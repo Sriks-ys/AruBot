@@ -69,7 +69,8 @@ private:
   double hw_start_sec_;
   double hw_stop_sec_;
   
-  int serialDevice; 
+  int serialDevice_rear;
+  int serialDevice_front; 
 
   const uint8_t HEADER1 = 0xAA;
   const uint8_t HEADER2 = 0x55;
@@ -81,7 +82,8 @@ private:
   };
 
   SerialPacket c;
-  uint8_t send_buffer[11];
+  uint8_t send_buffer_rear[11];
+  uint8_t send_buffer_front[11];
 
   enum class RxState {
     WAIT_HEADER1,
@@ -102,7 +104,8 @@ private:
   std::size_t rx_index_{0};
   std::array<uint8_t, sizeof(feedback)> rx_buffer_;
 
-  feedback feedback_;
+  feedback feedback_rear;
+  feedback feedback_front;
 
 
   uint8_t checksum(const uint8_t *data, size_t len);

@@ -11,7 +11,7 @@
   <xacro:property name="base_height" value="0.005" />
   <xacro:property name="wheel_mass" value="0.3" /> <!-- arbitrary value for wheel mass -->
   <xacro:property name="wheel_len" value="0.029" />
-  <xacro:property name="wheel_radius" value="0.065" />
+  <xacro:property name="wheel_radius" value="0.0325" />
   <xacro:property name="caster_wheel_mass" value="0.1" /> <!-- arbitrary value for caster wheel mass -->
   <xacro:property name="caster_wheel_radius" value="0.015" />
 
@@ -118,7 +118,7 @@
   <joint name="${prefix}rear_right_wheel_joint" type="continuous">
     <parent link="${prefix}base_link"/>
     <child link="${prefix}rear_right_wheel"/>
-    <origin xyz="-0.08355 -0.136701 -0.051657" rpy="${PI/2} 0 0"/>
+    <origin xyz="-0.08355 -0.136701 -0.051657" rpy="${-PI/2} 0 0"/>
     <axis xyz="0 0 1"/>
     <limit effort="100" velocity="1.0"/>
   </joint>
@@ -132,11 +132,11 @@
     <limit effort="100" velocity="1.0"/>
   </joint>
 
-  <!-- front left wheel joint-->
+  <!-- front right wheel joint-->
   <joint name="${prefix}front_right_wheel_joint" type="continuous">
     <parent link="${prefix}base_link"/>
     <child link="${prefix}front_right_wheel"/>
-    <origin xyz="0.07145 -0.136701 -0.051657" rpy="${PI/2} 0 0"/>
+    <origin xyz="0.07145 -0.136701 -0.051657" rpy="${-PI/2} 0 0"/>
     <axis xyz="0 0 1"/>
     <limit effort="100" velocity="1.0"/>
   </joint>

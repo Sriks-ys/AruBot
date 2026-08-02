@@ -22,6 +22,7 @@
 #include <memory>
 #include <sstream>
 #include <vector>
+#include <array>
 
 #include <fcntl.h>
 #include <unistd.h>
@@ -110,11 +111,18 @@ hardware_interface::CallbackReturn MecanumSystemHardware::on_configure(const rcl
     set_command(name, 0.0);
   }
 
-  serialDevice = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY);
+  serialDevice_rear = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY);
+  serialDevice_front = open("/dev/ttyUSB1", O_RDWR | O_NOCTTY);
   
-  if (serialDevice < 0)
+  if (serialDevice_rear < 0)
   {
-      RCLCPP_ERROR(get_logger(), "Failed to open serial port");
+      RCLCPP_ERROR(get_logger(), "Failed to open serial port for rear arduino");
+      return hardware_interface::CallbackReturn::ERROR;
+  }
+
+  if (serialDevice_front < 0)
+  {
+      RCLCPP_ERROR(get_logger(), "Failed to open serial port for front arduino");
       return hardware_interface::CallbackReturn::ERROR;
   }
 
@@ -133,26 +141,45 @@ hardware_interface::CallbackReturn MecanumSystemHardware::on_activate(
     set_command(name, get_state(name));
   }
 
-  struct termios tty{};
-  tcgetattr(serialDevice, &tty);
+  struct termios tty_rear{};
+  struct termios tty_front{};
+  tcgetattr(serialDevice_rear, &tty_rear);
+  tcgetattr(serialDevice_front, &tty_front);
 
-  cfsetispeed(&tty, B115200);
-  cfsetospeed(&tty, B115200);
+  cfsetispeed(&tty_rear, B115200);
+  cfsetospeed(&tty_rear, B115200);
 
-  tty.c_cflag |= (CLOCAL | CREAD);
-  tty.c_cflag &= ~PARENB;
-  tty.c_cflag &= ~CSTOPB;
-  tty.c_cflag &= ~CSIZE;
-  tty.c_cflag |= CS8;
+  cfsetispeed(&tty_front, B115200);
+  cfsetospeed(&tty_front, B115200);
 
-  tty.c_lflag = 0;
-  tty.c_iflag = 0;
-  tty.c_oflag = 0;
+  tty_rear.c_cflag |= (CLOCAL | CREAD);
+  tty_rear.c_cflag &= ~PARENB;
+  tty_rear.c_cflag &= ~CSTOPB;
+  tty_rear.c_cflag &= ~CSIZE;
+  tty_rear.c_cflag |= CS8;
 
-  tty.c_cc[VMIN] = 0;
-  tty.c_cc[VTIME] = 0;
+  tty_rear.c_lflag = 0;
+  tty_rear.c_iflag = 0;
+  tty_rear.c_oflag = 0;
 
-  tcsetattr(serialDevice, TCSANOW, &tty);
+  tty_rear.c_cc[VMIN] = 0;
+  tty_rear.c_cc[VTIME] = 0;
+
+  tty_front.c_cflag |= (CLOCAL | CREAD);
+  tty_front.c_cflag &= ~PARENB;
+  tty_front.c_cflag &= ~CSTOPB;
+  tty_front.c_cflag &= ~CSIZE;
+  tty_front.c_cflag |= CS8;
+
+  tty_front.c_lflag = 0;
+  tty_front.c_iflag = 0;
+  tty_front.c_oflag = 0;
+
+  tty_front.c_cc[VMIN] = 0;
+  tty_front.c_cc[VTIME] = 0;
+
+  tcsetattr(serialDevice_rear, TCSANOW, &tty_rear);
+  tcsetattr(serialDevice_front, TCSANOW, &tty_front);
 
   RCLCPP_INFO(get_logger(), "Successfully activated!");
 
@@ -162,10 +189,16 @@ hardware_interface::CallbackReturn MecanumSystemHardware::on_activate(
 hardware_interface::CallbackReturn MecanumSystemHardware::on_deactivate(
   const rclcpp_lifecycle::State & /*previous_state*/)
 {
-  if (serialDevice >= 0)
+  if (serialDevice_rear >= 0)
   {
-      ::close(serialDevice);
-      serialDevice = -1;
+      ::close(serialDevice_rear);
+      serialDevice_rear = -1;
+  }
+
+  if (serialDevice_front >= 0)
+  {
+      ::close(serialDevice_front);
+      serialDevice_front = -1;
   }
 
   RCLCPP_INFO(get_logger(), "Successfully deactivated!");
@@ -179,7 +212,7 @@ hardware_interface::return_type MecanumSystemHardware::read(
   
   uint8_t byte;
 
-  while(::read(serialDevice, &byte, 1) == 1){
+  while(::read(serialDevice_rear, &byte, 1) == 1){
     switch (rx_state_) {
       case RxState::WAIT_HEADER1:
           if (byte == HEADER1)
@@ -200,28 +233,63 @@ hardware_interface::return_type MecanumSystemHardware::read(
 
       case RxState::READ_PAYLOAD:
           rx_buffer_[rx_index_++] = byte;
-
+ 
           if (rx_index_ == sizeof(feedback))
           {
-              std::memcpy(&feedback_, rx_buffer_.data(), sizeof(feedback));
+              std::memcpy(&feedback_rear, rx_buffer_.data(), sizeof(feedback));
               rx_state_ = RxState::WAIT_HEADER1;
 
-              set_state("rear_left_wheel_joint/velocity", static_cast<double>(feedback_.left_velocity));
-              set_state("rear_right_wheel_joint/velocity", static_cast<double>(feedback_.right_velocity));
+              set_state("rear_left_wheel_joint/velocity", static_cast<double>(feedback_rear.left_velocity));
+              set_state("rear_right_wheel_joint/velocity", static_cast<double>(feedback_rear.right_velocity));
 
-              set_state("front_left_wheel_joint/velocity", get_command("front_left_wheel_joint/velocity"));
-              set_state("front_right_wheel_joint/velocity", get_command("front_right_wheel_joint/velocity"));
+              set_state("rear_left_wheel_joint/position", static_cast<double>(feedback_rear.left_position));
+              set_state("rear_right_wheel_joint/position", static_cast<double>(feedback_rear.right_position));
+          }
+          break;
+    }
+  }
+  rx_index_ = 0;
+  rx_state_ = RxState::WAIT_HEADER1;
+  rx_buffer_.fill(0);
+  while(::read(serialDevice_front, &byte, 1) == 1){
+    switch (rx_state_) {
+      case RxState::WAIT_HEADER1:
+          if (byte == HEADER1)
+              rx_state_ = RxState::WAIT_HEADER2;
+          break;
 
-              set_state("rear_left_wheel_joint/position", static_cast<double>(feedback_.left_position));
-              set_state("rear_right_wheel_joint/position", static_cast<double>(feedback_.right_position));
+      case RxState::WAIT_HEADER2:
+          if (byte == HEADER2)
+          {
+              rx_index_ = 0;
+              rx_state_ = RxState::READ_PAYLOAD;
+          }
+          else if (byte != HEADER1)
+          {
+              rx_state_ = RxState::WAIT_HEADER1;
+          }
+          break;
 
-              set_state("front_left_wheel_joint/position", get_state("front_left_wheel_joint/position") + period.seconds() * get_command("front_left_wheel_joint/velocity"));
-              set_state("front_right_wheel_joint/position", get_state("front_right_wheel_joint/position") + period.seconds() * get_command("front_right_wheel_joint/velocity"));
+      case RxState::READ_PAYLOAD:
+          rx_buffer_[rx_index_++] = byte;
+ 
+          if (rx_index_ == sizeof(feedback))
+          {
+              std::memcpy(&feedback_front, rx_buffer_.data(), sizeof(feedback));
+              rx_state_ = RxState::WAIT_HEADER1;
+
+              set_state("front_left_wheel_joint/velocity", static_cast<double>(feedback_front.left_velocity));
+              set_state("front_right_wheel_joint/velocity", static_cast<double>(feedback_front.right_velocity));
+
+              set_state("front_left_wheel_joint/position", static_cast<double>(feedback_front.left_position));
+              set_state("front_right_wheel_joint/position", static_cast<double>(feedback_front.right_position));
           }
           break;
     }
 
   }
+  //RCLCPP_INFO(get_logger(), "Rear Left Wheel: Velocity: %.2f Position: %.2f", feedback_rear.left_velocity, feedback_rear.left_position);
+  //RCLCPP_INFO(get_logger(), "Front Left Wheel: Velocity: %.2f Position: %.2f", feedback_front.left_velocity, feedback_front.left_position);
 
   return hardware_interface::return_type::OK;
 }
@@ -229,22 +297,39 @@ hardware_interface::return_type MecanumSystemHardware::read(
 hardware_interface::return_type mecanum_robot_hardware ::MecanumSystemHardware::write(
   const rclcpp::Time & /*time*/, const rclcpp::Duration & /*period*/)
 {
-  //float fl = static_cast<float>(get_command("front_left_wheel_joint/velocity"));
-  //float fr = static_cast<float>(get_command("front_right_wheel_joint/velocity"));
+  float fl = static_cast<float>(get_command("front_left_wheel_joint/velocity"));
+  float fr = static_cast<float>(get_command("front_right_wheel_joint/velocity"));
   float rl = static_cast<float>(get_command("rear_left_wheel_joint/velocity"));
   float rr = static_cast<float>(get_command("rear_right_wheel_joint/velocity"));
 
-  send_buffer[0] = HEADER1;
-  send_buffer[1] = HEADER2;
-  memcpy(send_buffer + 2,  &rl, 4);
-  memcpy(send_buffer + 6,  &rr, 4);
-  send_buffer[10] = checksum(send_buffer + 2, 8);
 
-  ssize_t n = ::write(serialDevice, send_buffer, sizeof(send_buffer));
+  send_buffer_rear[0] = HEADER1;
+  send_buffer_rear[1] = HEADER2;
 
-  if (n != sizeof(send_buffer))
+  send_buffer_front[0] = HEADER1;
+  send_buffer_front[1] = HEADER2;
+
+
+  memcpy(send_buffer_rear + 2,  &rl, 4);
+  memcpy(send_buffer_rear + 6,  &rr, 4);
+
+  memcpy(send_buffer_front + 2,  &fl, 4);
+  memcpy(send_buffer_front + 6,  &fr, 4);
+
+  send_buffer_rear[10] = checksum(send_buffer_rear + 2, 8);
+  send_buffer_front[10] = checksum(send_buffer_front + 2, 8);
+
+  ssize_t nr = ::write(serialDevice_rear, send_buffer_rear, sizeof(send_buffer_rear));
+  ssize_t nf = ::write(serialDevice_front, send_buffer_front, sizeof(send_buffer_front));
+
+  if (nr != sizeof(send_buffer_rear))
   {
-      RCLCPP_WARN(get_logger(), "Serial write failed");
+      RCLCPP_WARN(get_logger(), "Rear Serial write failed");
+  }
+
+  if (nf != sizeof(send_buffer_front))
+  {
+      RCLCPP_WARN(get_logger(), "Front Serial write failed");
   }
   
   return hardware_interface::return_type::OK;

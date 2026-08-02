@@ -15,7 +15,7 @@
     <link name = "rear_left_wheel">
         <visual>
             <geometry>
-                <cylinder radius = "0.065" length = "0.029"/>    
+                <cylinder radius = "0.0325" length = "0.029"/>    
             </geometry>
             <origin xyz = "0 0 0" rpy = "0 0 0"/>
         </visual>
@@ -24,7 +24,7 @@
     <link name = "rear_right_wheel">
         <visual>
             <geometry>
-                <cylinder radius = "0.065" length = "0.029"/>
+                <cylinder radius = "0.0325" length = "0.029"/>
             </geometry>
             <origin xyz = "0 0 0" rpy = "0 0 0"/>
         </visual>
@@ -33,7 +33,7 @@
     <link name = "front_left_wheel">
         <visual>
             <geometry>
-                <cylinder radius = "0.065" length = "0.029"/>
+                <cylinder radius = "0.0325" length = "0.029"/>
             </geometry>
             <origin xyz = "0 0 0" rpy = "0 0 0"/>
         </visual>
@@ -42,7 +42,7 @@
     <link name = "front_right_wheel">
         <visual>
             <geometry>
-                <cylinder radius = "0.065" length = "0.029"/>
+                <cylinder radius = "0.0325" length = "0.029"/>
             </geometry>
             <origin xyz = "0 0 0" rpy = "0 0 0"/>
         </visual>
@@ -58,7 +58,7 @@
     <joint name = "base_link_rear_right_wheel" type = "continuous">
         <parent link = "base_link"/>
         <child link = "rear_right_wheel"/>
-        <origin xyz = "-0.08355 -0.136701 -0.051657" rpy = "1.57 0 0"/>
+        <origin xyz = "-0.08355 -0.136701 -0.051657" rpy = "-1.57 0 0"/>
         <axis xyz = "0 0 1"/>
     </joint>
 
@@ -72,7 +72,7 @@
     <joint name = "base_link_front_right_wheel" type = "continuous">
         <parent link = "base_link"/>
         <child link = "front_right_wheel"/>
-        <origin xyz = "0.07145 -0.136701 -0.051657" rpy = "1.57 0 0"/>
+        <origin xyz = "0.07145 -0.136701 -0.051657" rpy = "-1.57 0 0"/>
         <axis xyz = "0 0 1"/>
     </joint>
 </robot>
