@@ -105,6 +105,23 @@
     </visual>
   </link>
 
+  <!-- Lidar Link-->
+  <link name="${prefix}laser">
+    <collision>
+      <origin xyz="0 0 0" rpy= "0 0 0"/>
+      <geometry>
+        <cylinder length="0.02" radius="0.07"/>
+      </geometry>
+    </collision>
+
+    <visual>
+      <origin xyz="0 0 0" rpy= "0 0 0"/>
+      <geometry>
+        <cylinder length="0.02" radius="0.07"/>
+      </geometry>
+    </visual>
+  </link>
+
   <!-- rear left wheel joint-->
   <joint name="${prefix}rear_left_wheel_joint" type="continuous">
     <parent link="${prefix}base_link"/>
@@ -139,6 +156,13 @@
     <origin xyz="0.07145 -0.136701 -0.051657" rpy="${-PI/2} 0 0"/>
     <axis xyz="0 0 1"/>
     <limit effort="100" velocity="1.0"/>
+  </joint>
+
+  <!-- Lidar joint-->
+  <joint name="${prefix}lidar_link_joint" type="fixed">
+    <parent link="${prefix}base_link"/>
+    <child link="${prefix}laser"/>
+    <origin xyz = "0.02435 0 0.176" rpy = "0 0 0"/>
   </joint>
   </xacro:macro>
 

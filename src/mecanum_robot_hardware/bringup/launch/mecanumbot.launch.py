@@ -83,14 +83,16 @@ def generate_launch_description():
                 name="controller_spawner",
                 arguments=[
                     "joint_state_broadcaster",
-                    "mecanum_base_controller", # Where is file coming from and how should i adapt for a mecanum controller 
+                    "mecanum_base_controller", 
                     "--param-file",
                     PathSubstitution(FindPackageShare("mecanum_robot_hardware"))
                     / "config"
                     / "mecanum_controllers.yaml",
-                    "--controller-ros-args",
-                    "-r ~/cmd_vel:=/cmd_vel",
-                ],
+                    "--ros-args",
+                    "--remap",
+                    "/mecanum_base_controller/reference:=/cmd_vel",
+                ], 
+                
             ),
         ]
     )
