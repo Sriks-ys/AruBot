@@ -82,7 +82,7 @@ class GoalManager(Node):
         goal_handle = future.result()
 
         if not goal_handle.accepted:
-            self.get_logger().warn(f"Nav2 rejected the goal: {goal_handle.}")
+            self.get_logger().warn(f"Nav2 rejected the goal: {goal_handle}")
             return 
         
         self.NAVIGATION_ACTIVE = True
@@ -91,7 +91,7 @@ class GoalManager(Node):
         result_future.add_done_callback(self.goal_result_callback)
     
     def goal_result_callback(self, future):
-        result_wrapper = future.result().result
+        result_wrapper = future.result()
 
         status = result_wrapper.status
         result = result_wrapper.result

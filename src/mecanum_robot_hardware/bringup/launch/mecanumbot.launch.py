@@ -93,12 +93,6 @@ def generate_launch_description():
                     "/mecanum_base_controller/reference:=/cmd_vel",
                 ], 
                 
-            ),
-
-            Node(
-                package = "network",
-                executable = "mqtt_bridge",
-                name = "mqtt_ground_station_reception"
             )
         ]
     )

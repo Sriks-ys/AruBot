@@ -1,0 +1,3 @@
+---
+# Returns Package Location and Orientation in Camera Frame
+geometry_msgs/PoseStamped pose
