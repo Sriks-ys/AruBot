@@ -111,8 +111,8 @@ hardware_interface::CallbackReturn MecanumSystemHardware::on_configure(const rcl
     set_command(name, 0.0);
   }
 
-  serialDevice_rear = open("/dev/ttyUSB0", O_RDWR | O_NOCTTY);
-  serialDevice_front = open("/dev/ttyUSB1", O_RDWR | O_NOCTTY);
+  serialDevice_rear = open("/dev/rear_arduino", O_RDWR | O_NOCTTY);
+  serialDevice_front = open("/dev/front_arduino", O_RDWR | O_NOCTTY);
   
   if (serialDevice_rear < 0)
   {

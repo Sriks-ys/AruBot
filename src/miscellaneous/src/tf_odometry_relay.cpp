@@ -14,7 +14,7 @@ public:
 
     subscription_ = this->create_subscription<tf2_msgs::msg::TFMessage>(
       "/mecanum_base_controller/tf_odometry",
-      rclcpp::QoS(rclcpp::KeepLast(100)).reliable().transient_local(),
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
       std::bind(
         &TfOdometryRelay::tf_callback,
         this,
@@ -24,7 +24,7 @@ public:
 
     subscription_odom = this->create_subscription<nav_msgs::msg::Odometry>(
       "/mecanum_base_controller/odometry",
-      rclcpp::QoS(rclcpp::KeepLast(100)).reliable().transient_local(),
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile(),
       std::bind(
         &TfOdometryRelay::odom_callback,
         this,
@@ -35,11 +35,11 @@ public:
 
     publisher_ = this->create_publisher<tf2_msgs::msg::TFMessage>(
       "/tf",
-      rclcpp::QoS(100));
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile());
 
     publisher_odom = this->create_publisher<nav_msgs::msg::Odometry>(
       "/odom",
-      rclcpp::QoS(100)
+      rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile()
     );
 
     RCLCPP_INFO(

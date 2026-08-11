@@ -94,5 +94,11 @@ def generate_launch_description():
                 ], 
                 
             ),
+
+            Node(
+                package = "network",
+                executable = "mqtt_bridge",
+                name = "mqtt_ground_station_reception"
+            )
         ]
     )

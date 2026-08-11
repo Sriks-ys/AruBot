@@ -17,7 +17,7 @@ mecanum_base_controller:
     kinematics:
       wheels_radius: 0.0325
       base_frame_offset: { x: -0.00605, y: 0.0, theta: 0.0 }
-      sum_of_robot_center_projection_on_X_Y_axis: 0.214201
+      sum_of_robot_center_projection_on_X_Y_axis: 0.224201
 
     odom_frame_id: odom
     base_frame_id: base_link
@@ -37,7 +37,7 @@ mecanum_base_controller:
     linear.y.max_acceleration: 0.25
     linear.y.max_deceleration: -0.35
 
-    angular.z.max_velocity: 0.9
-    angular.z.min_velocity: -0.9
+    angular.z.max_velocity: 1.4
+    angular.z.min_velocity: -1.4
     angular.z.max_acceleration: 2.0
     angular.z.min_acceleration: -2.5

@@ -2,7 +2,7 @@ import json
 
 import rclpy
 from rclpy.node import Node
-
+from geometry_msgs.msg import Point
 import paho.mqtt.client as mqtt
 
 BROKER_IP = "localhost"
@@ -19,6 +19,8 @@ class mqtt_bridge(Node):
         self.client.connect(BROKER_IP, 1883)
         self.client.loop_start()
 
+        self.point_publisher = self.create_publisher(Point, '/package_from_drone', 10)
+
         self.get_logger().info("Waiting for Package location from drone")
 
     def on_connect(self, client, userdata, flags, reason_code, properties=None):
@@ -28,6 +30,16 @@ class mqtt_bridge(Node):
     def on_message(self, client, userdata, msg):
         data = json.loads(msg.payload.decode())
         self.get_logger().info(f"Data: {data}")
+
+        id = float(data["ID"])
+        x = float(data["x"])
+        y = float(data["y"])
+
+        self.point_publisher.publish(Point(
+            x = x,
+            y = y,
+            z = id
+        ))
 
         self.client.loop_stop()
         self.client.disconnect()
