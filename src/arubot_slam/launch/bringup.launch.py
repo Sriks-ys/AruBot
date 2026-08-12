@@ -8,8 +8,13 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
+    target_id = LaunchConfiguration('package_id')
 
-
+    package_arguement = DeclareLaunchArgument(
+        'package_id',
+        default_value='10',
+        description="Robot will look for package with this id"
+    )
     sllidar_pkg_dir = get_package_share_directory('sllidar_ros2')
     sllidar_launch = IncludeLaunchDescription(
         PythonLaunchDescriptionSource(
@@ -50,18 +55,38 @@ def generate_launch_description():
         output = 'screen'
     )
 
+    servo_bridge = Node(
+        package = 'miscellaneous',
+        executable = 'servo_hardware_controller',
+        name = 'servo_bridge',
+        output = 'screen'
+    )
+
+    camera_node = Node(
+        package = "goal_managers",
+        executable = "aruco_detector",
+        name = "camera_node",
+        output = "screen",
+        parameters = [
+            {
+                "target_id": target_id
+            }
+        ]
+    )
+
 
     delayed_mecanum = TimerAction(
         period=5.0,
-        actions=[mecanum_launch]
+        actions=[mecanum_launch, servo_bridge, camera_node]
     )
 
     delayed_relay = TimerAction(
-        period=10.0,
+        period=11.0,
         actions=[tf_odometry_relay_node, network_mqtt, goal_manager]
     )
 
     return LaunchDescription([
+        package_arguement,
         sllidar_launch,
         delayed_mecanum,
         delayed_relay

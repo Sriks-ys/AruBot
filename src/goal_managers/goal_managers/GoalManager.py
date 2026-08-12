@@ -5,7 +5,7 @@ from geometry_msgs.msg import Point
 from nav2_msgs.action import NavigateToPose
 from action_msgs.msg import GoalStatus
 from lifecycle_msgs.srv import GetState
-
+from std_msgs.msg import String
 
 class GoalManager(Node):
     def __init__(self):
@@ -17,9 +17,13 @@ class GoalManager(Node):
         self.STAGE = self.STAGES[self.stage_id]
 
         self.drone_package_sub = self.create_subscription(Point, '/package_from_drone', self.drone_location_callback, 10)
+
+        self.camera_command_pub = self.create_publisher(String, "/camera_command", 10)
         self.nav_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
         
         self.nav2_state_client = self.create_client(GetState, '/bt_navigator/get_state')
+
+        self.Main_timer = self.create_timer(10, self.main_thread)
 
         self.drone_package_location = (0, 0)
         self.Target_ID = -1
@@ -28,17 +32,28 @@ class GoalManager(Node):
 
         self.NAVIGATION_ACTIVE = False
 
-        self.MAX_TRIES = 3
+        self.MAX_TRIES = 5
         self.TRIES_REMAINING = self.MAX_TRIES
 
         self.last_goal = None
 
+        self.state_command_initiated = False
+
+    def main_thread(self):
+        if self.STAGE == "INIT":
+            return 
+        elif self.STAGE == "NEXT_PACKAGE":
+            self.get_logger().info("Next to Package")
+            self.get_logger().info("Starting camera for tracking")
+            if not self.state_command_initiated:
+                self.camera_command_pub.publish(String(data = "track"))
+                self.state_command_initiated = True
 
     def drone_location_callback(self, msg: Point):
         self.drone_package_location = (msg.x, msg.y)
         self.Target_ID = msg.z
         
-        x_goal = msg.y - 1
+        x_goal = msg.y - 1.2
         y_goal = msg.x
 
         
@@ -103,11 +118,11 @@ class GoalManager(Node):
             
             self.stage_id += 1
             self.STAGE = self.STAGES[self.stage_id]
-
+            self.get_logger().info(f"Reached Stage: {self.STAGE}")
             if self.TRIES_REMAINING != self.MAX_TRIES:
                 self.get_logger().info(f"Goal Succseeded after {self.MAX_TRIES - self.TRIES_REMAINING}")
                 self.TRIES_REMAINING = self.MAX_TRIES
-        
+            
         else:
             if (self.TRIES_REMAINING > 0):
                 self.get_logger().warn(f"Navigation to {self.STAGE} failed, retrying to {self.last_goal}")
