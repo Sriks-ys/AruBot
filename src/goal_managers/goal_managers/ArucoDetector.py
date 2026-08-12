@@ -109,7 +109,8 @@ class ArucoDetector(Node):
 
             if ids is None:
                 if self.Tries > 0:
-                    self.get_logger().warn(f"No Target ArUco marker detected stopping tracking trying again  {ids}")
+                    self.get_logger().warn(f"No Target ArUco marker detected stopping tracking trying again resetting angle to 30 degrees to try again {ids}")
+                    self.servo_publisher.publish(UInt8(data = 30))
                     self.publish_debug_image(debug_frame)
                     self.Tries -= 1
                 else:
@@ -192,10 +193,13 @@ class ArucoDetector(Node):
 
             if front_candidate is not None:
                 T_output = front_candidate["T"]
+                self.servo_publisher.publish(UInt8(data = self.calculate_servo_angle(T_output[:3, 3])))
             elif T_camera_top is not None and self.T_top_front is not None:
                 T_output = T_camera_top @ self.T_top_front
+                self.servo_publisher.publish(UInt8(data = self.calculate_servo_angle(T_camera_top[:3, 3])))
             elif T_camera_top is not None:
                 T_output = T_camera_top
+                self.servo_publisher.publish(UInt8(data = self.calculate_servo_angle(T_camera_top[:3, 3])))
             
             self.publish_debug_image(debug_frame)
 
@@ -203,23 +207,40 @@ class ArucoDetector(Node):
                 self.get_logger().warn("Could not determine package pose")
                 return
 
-            response = PoseStamped()
+            try:
+                transform = self.tf_buffer.lookup_transform(
+                    "base_link",
+                    "camera",
+                    rclpy.time.Time()
+                )
+                
+                T_base_camera = self.transform_to_matrix(transform)
 
-            self.servo_publisher.publish(UInt8(data = self.calculate_servo_angle(T_output[:3, 3])))
+                T_base_target = T_base_camera @ T_output
 
-            q = self.rotation_matrix_to_quaternion(T_output[:3, :3])
+            except Exception as e:
+                self.get_logger().warn(
+                    f"Could not transform to base_link frame: {e}, /n "
+                )
+                return
 
-            response.header.frame_id = "camera"
-            response.pose.position.x = T_output[0, 3]
-            response.pose.position.y = T_output[1, 3]
-            response.pose.position.z = T_output[2, 3]
-            response.pose.orientation.x = q[0]
-            response.pose.orientation.y = q[1]
-            response.pose.orientation.z = q[2]
-            response.pose.orientation.w = q[3]
-            response.header.stamp = self.get_clock().now().to_msg()
-            self.pose_publisher.publish(response)
-            return 
+            response_base = PoseStamped()
+
+            response_base.header.stamp = self.get_clock().now().to_msg()
+            response_base.header.frame_id = "base_link"
+
+            response_base.pose.position.x = float(T_base_target[0, 3])
+            response_base.pose.position.y = float(T_base_target[1, 3])
+            response_base.pose.position.z = float(T_base_target[2, 3])
+
+            q = self.rotation_matrix_to_quaternion(T_base_target[:3, :3])
+
+            response_base.pose.orientation.x = float(q[0])
+            response_base.pose.orientation.y = float(q[1])
+            response_base.pose.orientation.z = float(q[2])
+            response_base.pose.orientation.w = float(q[3])
+
+            self.pose_publisher.publish(response_base)
 
         except Exception as e:
             self.tracking = False
@@ -323,7 +344,7 @@ class ArucoDetector(Node):
         
         # x, z relative to servo origin
         x = target_base.point.x - 0.098162
-        z = target_base.point.z + 0.110597
+        z = 0.110597 - target_base.point.z
 
         angle_rad = math.atan2(z, x)
 
@@ -333,6 +354,34 @@ class ArucoDetector(Node):
         angle_deg = max(0.0, min(85.0, angle_deg))
 
         return int(round(angle_deg))
+
+    def transform_to_matrix(self, transform):
+        t = transform.transform.translation
+        q = transform.transform.rotation
+
+        # Quaternion -> rotation matrix
+        x = q.x
+        y = q.y
+        z = q.z
+        w = q.w
+
+        R = np.array([
+            [1 - 2*(y*y + z*z),     2*(x*y - z*w),     2*(x*z + y*w)],
+            [    2*(x*y + z*w), 1 - 2*(x*x + z*z),     2*(y*z - x*w)],
+            [    2*(x*z - y*w),     2*(y*z + x*w), 1 - 2*(x*x + y*y)]
+        ], dtype=np.float64)
+
+        T = np.eye(4, dtype=np.float64)
+
+        T[:3, :3] = R
+
+        T[:3, 3] = [
+            t.x,
+            t.y,
+            t.z
+        ]
+
+        return T
 
 
 
