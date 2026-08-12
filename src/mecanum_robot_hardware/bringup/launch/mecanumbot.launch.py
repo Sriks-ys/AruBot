@@ -83,7 +83,8 @@ def generate_launch_description():
                 name="controller_spawner",
                 arguments=[
                     "joint_state_broadcaster",
-                    "mecanum_base_controller", 
+                    "mecanum_base_controller",
+                    "gpio_command_controller",
                     "--param-file",
                     PathSubstitution(FindPackageShare("mecanum_robot_hardware"))
                     / "config"

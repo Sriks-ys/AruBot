@@ -1,16 +1,3 @@
-// Copyright 2021 ros2_control Development Team
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
 
 #include "mecanum_robot_hardware/mecanumbot_system.hpp"
 
@@ -244,6 +231,20 @@ hardware_interface::return_type MecanumSystemHardware::read(
 
               set_state("rear_left_wheel_joint/position", static_cast<double>(feedback_rear.left_position));
               set_state("rear_right_wheel_joint/position", static_cast<double>(feedback_rear.right_position));
+
+              const double has_package = (feedback_rear.stage != 0) ? 1.0 : 0.0;
+
+              try
+              {
+                set_state("dock_sensor/has_package", has_package);
+              }
+              catch (const std::exception & e)
+              {
+                RCLCPP_ERROR(
+                    get_logger(),
+                    "Failed to set dock_sensor/has_package: %s",
+                    e.what());
+              }
           }
           break;
     }
@@ -283,6 +284,7 @@ hardware_interface::return_type MecanumSystemHardware::read(
 
               set_state("front_left_wheel_joint/position", static_cast<double>(feedback_front.left_position));
               set_state("front_right_wheel_joint/position", static_cast<double>(feedback_front.right_position));
+              
           }
           break;
     }

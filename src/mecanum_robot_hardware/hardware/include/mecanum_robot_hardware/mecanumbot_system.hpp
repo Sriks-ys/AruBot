@@ -98,6 +98,7 @@ private:
     float right_velocity;
     float left_position;
     float right_position;
+    uint8_t stage;
   };
 
   RxState rx_state_{RxState::WAIT_HEADER1};

@@ -10,11 +10,15 @@ find_package(ament_cmake REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(tf2_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
+find_package(sensor_msgs REQUIRED)
+
 # uncomment the following section in order to fill in
 # further dependencies manually.
 # find_package(<dependency> REQUIRED)
 
 add_executable(tf_odometry_relay src/tf_odometry_relay.cpp)
+add_executable(servo_hardware_controller src/servo_hardware_controller.cpp)
 
 ament_target_dependencies(
   tf_odometry_relay
@@ -23,9 +27,17 @@ ament_target_dependencies(
   nav_msgs
 )
 
+ament_target_dependencies(
+  servo_hardware_controller
+  rclcpp
+  std_msgs
+  sensor_msgs
+)
+
 install(
   TARGETS
     tf_odometry_relay
+    servo_hardware_controller
   DESTINATION lib/${PROJECT_NAME}
 )
 

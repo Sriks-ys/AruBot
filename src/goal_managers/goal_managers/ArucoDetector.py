@@ -1,15 +1,20 @@
+import sys
+
+sys.path.insert(0, "/home/arubot/kmsxx/build/py")
+sys.path.insert(0, "/usr/local/lib/python3/dist-packages")
+
 import cv2
 import numpy as np
 import time
 
 import rclpy
 from rclpy.node import Node
-from geometry_msgs.msg import PoseStamped
 
+from sensor_msgs.msg import Image
 from picamera2 import Picamera2
+from arubot_interface.srv import CameraPackagePose
 
 
-TARGET_ID = 10
 MARKER_SIZE = 0.07  # 7 cm
 
 
@@ -18,14 +23,30 @@ class ArucoDetector(Node):
     def __init__(self):
         super().__init__('aruco_detector')
 
-        # ROS 2 publisher
-        self.pose_publisher = self.create_publisher(
-            PoseStamped,
-            '/aruco_pose',
+        # --------------------------------------------------
+        # ROS 2 SERVICE
+        # --------------------------------------------------
+
+        self.service = self.create_service(
+            CameraPackagePose,
+            '/camera_package_pose',
+            self.get_package_pose_callback
+        )
+
+        # --------------------------------------------------
+        # DEBUG IMAGE PUBLISHER
+        # --------------------------------------------------
+
+        self.image_publisher = self.create_publisher(
+            Image,
+            '/camera/package_pose/debug_image',
             10
         )
 
-        # Load camera calibration
+        # --------------------------------------------------
+        # CAMERA CALIBRATION
+        # --------------------------------------------------
+
         fs = cv2.FileStorage(
             "/home/arubot/pi_cam_calib.yaml",
             cv2.FILE_STORAGE_READ
@@ -38,15 +59,22 @@ class ArucoDetector(Node):
 
         if self.camera_matrix is None:
             raise RuntimeError(
-                "Could not load camera matrix from "
-                "/home/arubot/pi_cam_calib.yaml"
+                "Could not load camera matrix"
+            )
+
+        if self.dist_coeffs is None:
+            raise RuntimeError(
+                "Could not load distortion coefficients"
             )
 
         self.get_logger().info(
             "Camera calibration loaded successfully"
         )
 
-        # Real coordinates of the four ArUco corners
+        # --------------------------------------------------
+        # ARUCO REAL-WORLD CORNER POINTS
+        # --------------------------------------------------
+
         half = MARKER_SIZE / 2.0
 
         self.object_points = np.array([
@@ -56,7 +84,10 @@ class ArucoDetector(Node):
             [-half, -half, 0.0]
         ], dtype=np.float32)
 
-        # ArUco setup
+        # --------------------------------------------------
+        # ARUCO SETUP
+        # --------------------------------------------------
+
         self.aruco = cv2.aruco
 
         self.dictionary = self.aruco.getPredefinedDictionary(
@@ -68,10 +99,13 @@ class ArucoDetector(Node):
         except AttributeError:
             self.params = self.aruco.DetectorParameters()
 
-        # Camera setup
+        # --------------------------------------------------
+        # CAMERA SETUP
+        # --------------------------------------------------
+
         self.picam2 = Picamera2()
 
-        config = self.picam2.create_preview_configuration(
+        config = self.picam2.create_still_configuration(
             main={
                 "size": (800, 600),
                 "format": "RGB888"
@@ -79,62 +113,266 @@ class ArucoDetector(Node):
         )
 
         self.picam2.configure(config)
-        self.picam2.start()
-
-        time.sleep(2)
 
         self.get_logger().info(
-            f"ArUco detector started. Target ID: {TARGET_ID}"
+            "Aruco service node ready"
         )
 
         self.get_logger().info(
-            "Publishing target pose on /aruco_pose"
+            "Selection mode: front-orientation filter + largest area"
         )
 
-        # Run detection every 0.2 seconds
-        self.timer = self.create_timer(
-            0.2,
-            self.detect_marker
+        self.get_logger().info(
+            "Waiting for requests on /camera_package_pose"
         )
 
-    def detect_marker(self):
-
-        frame = self.picam2.capture_array()
-
-        corners, ids, _ = self.aruco.detectMarkers(
-            frame,
-            self.dictionary,
-            parameters=self.params
+        self.get_logger().info(
+            "Debug image topic: /camera/package_pose/debug_image"
         )
 
-        if ids is None:
-            return
+    # ======================================================
+    # SERVICE CALLBACK
+    # ======================================================
 
-        for marker_corners, marker_id in zip(
-            corners,
-            ids.flatten()
-        ):
+    def get_package_pose_callback(self, request, response):
 
-            if int(marker_id) != TARGET_ID:
-                continue
+        self.get_logger().info(
+            "Camera package pose requested"
+        )
 
-            image_points = marker_corners[0].astype(
-                np.float32
+        try:
+
+            # ----------------------------------------------
+            # CAPTURE ONE FRAME
+            # ----------------------------------------------
+
+            self.picam2.start()
+
+            time.sleep(0.5)
+
+            frame = self.picam2.capture_array()
+
+            self.picam2.stop()
+
+            self.get_logger().info(
+                "Frame captured"
             )
 
-            success, rvec, tvec = cv2.solvePnP(
-                self.object_points,
-                image_points,
+            # ----------------------------------------------
+            # DETECT ALL ARUCO MARKERS
+            # ----------------------------------------------
+
+            corners, ids, _ = self.aruco.detectMarkers(
+                frame,
+                self.dictionary,
+                parameters=self.params
+            )
+
+            if ids is None:
+
+                self.get_logger().warn(
+                    "No ArUco marker detected"
+                )
+
+                return response
+
+            # ----------------------------------------------
+            # FIND FRONT-FACING CANDIDATES
+            # ----------------------------------------------
+
+            candidates = []
+
+            for marker_corners, marker_id in zip(
+                corners,
+                ids.flatten()
+            ):
+
+                image_points = marker_corners[0].astype(
+                    np.float32
+                )
+
+                area = float(
+                    cv2.contourArea(image_points)
+                )
+
+                success, rvec, tvec = cv2.solvePnP(
+                    self.object_points,
+                    image_points,
+                    self.camera_matrix,
+                    self.dist_coeffs,
+                    flags=cv2.SOLVEPNP_IPPE_SQUARE
+                )
+
+                if not success:
+
+                    self.get_logger().warn(
+                        f"solvePnP failed for ID {int(marker_id)}"
+                    )
+
+                    continue
+
+                # ------------------------------------------
+                # MARKER NORMAL IN CAMERA FRAME
+                # ------------------------------------------
+
+                rotation_matrix, _ = cv2.Rodrigues(
+                    rvec
+                )
+
+                normal_marker = np.array(
+                    [0.0, 0.0, 1.0]
+                )
+
+                normal_camera = (
+                    rotation_matrix @ normal_marker
+                )
+
+                nx = float(normal_camera[0])
+                ny = float(normal_camera[1])
+                nz = float(normal_camera[2])
+
+                self.get_logger().info(
+                    f"Detected ID {int(marker_id)} | "
+                    f"Area={area:.1f} px^2 | "
+                    f"Normal=({nx:.2f}, {ny:.2f}, {nz:.2f})"
+                )
+
+                # ------------------------------------------
+                # FRONT-FACE FILTER
+                #
+                # Front marker should have normal mainly
+                # along camera Z rather than camera Y.
+                # ------------------------------------------
+
+                if abs(nz) > 0.40:
+
+                    self.get_logger().info(
+                        f"ID {int(marker_id)} accepted as front-like"
+                    )
+
+                    candidates.append({
+                        "id": int(marker_id),
+                        "area": area,
+                        "corners": marker_corners,
+                        "rvec": rvec,
+                        "tvec": tvec
+                    })
+
+                else:
+
+                    self.get_logger().info(
+                        f"ID {int(marker_id)} rejected as top-like"
+                    )
+
+            # ----------------------------------------------
+            # CHECK IF ANY FRONT CANDIDATE EXISTS
+            # ----------------------------------------------
+
+            if len(candidates) == 0:
+
+                self.get_logger().warn(
+                    "No front-facing ArUco candidate found"
+                )
+
+                return response
+
+            # ----------------------------------------------
+            # SELECT LARGEST FRONT-FACING MARKER
+            # ----------------------------------------------
+
+            selected = max(
+                candidates,
+                key=lambda item: item["area"]
+            )
+
+            selected_id = selected["id"]
+            selected_area = selected["area"]
+            selected_corners = selected["corners"]
+            rvec = selected["rvec"]
+            tvec = selected["tvec"]
+
+            self.get_logger().info(
+                f"Selected front marker ID {selected_id} | "
+                f"Area={selected_area:.1f} px^2"
+            )
+
+            # ----------------------------------------------
+            # DRAW ALL DETECTED MARKERS
+            # ----------------------------------------------
+
+            self.aruco.drawDetectedMarkers(
+                frame,
+                corners,
+                ids
+            )
+
+            # ----------------------------------------------
+            # DRAW AXES FOR SELECTED MARKER
+            # ----------------------------------------------
+
+            cv2.drawFrameAxes(
+                frame,
                 self.camera_matrix,
                 self.dist_coeffs,
-                flags=cv2.SOLVEPNP_IPPE_SQUARE
+                rvec,
+                tvec,
+                0.05
             )
 
-            if not success:
-                self.get_logger().warn(
-                    "solvePnP failed"
-                )
-                return
+            # ----------------------------------------------
+            # DRAW SELECTION TEXT
+            # ----------------------------------------------
+
+            center = np.mean(
+                selected_corners[0],
+                axis=0
+            ).astype(int)
+
+            cv2.putText(
+                frame,
+                f"SELECTED ID {selected_id} AREA {selected_area:.0f}",
+                (
+                    max(0, int(center[0]) - 120),
+                    max(20, int(center[1]) - 20)
+                ),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6,
+                (255, 255, 255),
+                2
+            )
+
+            # ----------------------------------------------
+            # PUBLISH DEBUG IMAGE
+            # ----------------------------------------------
+
+            image_msg = Image()
+
+            image_msg.header.stamp = (
+                self.get_clock().now().to_msg()
+            )
+
+            image_msg.header.frame_id = "camera"
+
+            image_msg.height = frame.shape[0]
+            image_msg.width = frame.shape[1]
+
+            image_msg.encoding = "rgb8"
+            image_msg.is_bigendian = 0
+
+            image_msg.step = frame.shape[1] * 3
+            image_msg.data = frame.tobytes()
+
+            self.image_publisher.publish(
+                image_msg
+            )
+
+            self.get_logger().info(
+                "Published solvePnP verification frame"
+            )
+
+            # ----------------------------------------------
+            # POSITION IN CAMERA FRAME
+            # ----------------------------------------------
 
             x = float(tvec[0][0])
             y = float(tvec[1][0])
@@ -144,63 +382,57 @@ class ArucoDetector(Node):
                 np.linalg.norm(tvec)
             )
 
-            # Determine left / center / right
-            center_x = int(
-                np.mean(
-                    marker_corners[0][:, 0]
-                )
-            )
+            # ----------------------------------------------
+            # RETURN POSESTAMPED
+            # ----------------------------------------------
 
-            image_center = frame.shape[1] // 2
-
-            if center_x < image_center - 50:
-                direction = "LEFT"
-
-            elif center_x > image_center + 50:
-                direction = "RIGHT"
-
-            else:
-                direction = "CENTER"
-
-            # Create PoseStamped message
-            msg = PoseStamped()
-
-            msg.header.stamp = (
+            response.pose.header.stamp = (
                 self.get_clock().now().to_msg()
             )
 
-            msg.header.frame_id = "camera"
+            response.pose.header.frame_id = "camera"
 
-            # Position from solvePnP
-            msg.pose.position.x = x
-            msg.pose.position.y = y
-            msg.pose.position.z = z
+            response.pose.pose.position.x = x
+            response.pose.pose.position.y = y
+            response.pose.pose.position.z = z
 
-            # Orientation not used yet
-            msg.pose.orientation.x = 0.0
-            msg.pose.orientation.y = 0.0
-            msg.pose.orientation.z = 0.0
-            msg.pose.orientation.w = 1.0
-
-            # Publish ROS 2 message
-            self.pose_publisher.publish(msg)
+            # Orientation still fixed for now
+            response.pose.pose.orientation.x = 0.0
+            response.pose.pose.orientation.y = 0.0
+            response.pose.pose.orientation.z = 0.0
+            response.pose.pose.orientation.w = 1.0
 
             self.get_logger().info(
-                f"Target {TARGET_ID} | "
-                f"{direction} | "
+                f"Package pose from selected marker ID {selected_id} | "
                 f"X={x:.3f} m | "
                 f"Y={y:.3f} m | "
                 f"Z={z:.3f} m | "
                 f"Distance={distance:.3f} m"
             )
 
-            break
+            return response
+
+        except Exception as e:
+
+            try:
+                self.picam2.stop()
+            except Exception:
+                pass
+
+            self.get_logger().error(
+                f"Camera/Aruco error: {str(e)}"
+            )
+
+            return response
+
+    # ======================================================
+    # SHUTDOWN
+    # ======================================================
 
     def destroy_node(self):
 
         try:
             self.picam2.stop()
-
         except Exception:
             pass
 
@@ -220,6 +452,7 @@ def main(args=None):
         pass
 
     finally:
+
         node.destroy_node()
 
         if rclpy.ok():

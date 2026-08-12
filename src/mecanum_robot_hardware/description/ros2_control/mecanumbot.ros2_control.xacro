@@ -41,7 +41,10 @@
         <state_interface name="position"/>
         <state_interface name="velocity"/>
       </joint>
-      
+
+      <gpio name="${prefix}dock_sensor">
+        <state_interface name="has_package"/> 
+      </gpio>
     </ros2_control>
 
   </xacro:macro>

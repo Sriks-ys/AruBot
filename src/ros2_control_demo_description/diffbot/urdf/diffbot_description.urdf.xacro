@@ -122,6 +122,56 @@
     </visual>
   </link>
 
+  <!-- Camera Servo Link-->
+  <link name="${prefix}camera_servo">
+    <collision>
+      <origin xyz="0 0 -0.016" rpy = "0 0 0"/>
+      <geometry>
+        <cylinder length='0.032' radius = '0.007'/>
+      </geometry>
+    </collision>
+
+    <visual>
+      <origin xyz="0 0 -0.016" rpy = "0 0 0"/>
+      <geometry>
+        <cylinder length='0.032' radius = '0.007'/>
+      </geometry>
+    </visual>
+  </link>
+
+  <!-- Camera Link -->
+  <link name="${prefix}camera">
+    <collision>
+      <origin xyz="0 0 -0.002115" rpy = "0 0 0"/>
+      <geometry>
+        <cylinder length='0.00423' radius = '0.006950'/>
+      </geometry>
+    </collision>
+
+    <visual>
+      <origin xyz="0 0 -0.002115" rpy = "0 0 0"/>
+      <geometry>
+        <cylinder length='0.00423' radius = '0.006950'/>
+      </geometry>
+    </visual>
+  </link>
+
+  <link name ="${prefix}gripper">
+    <collision>
+      <origin xyz="-0.01 0 0" rpy = "0 0 0"/>
+      <geometry>
+        <box size = "0.02 0.086 0.069359"/>
+      </geometry>
+    </collision>
+
+    <visual>
+      <origin xyz="-0.01 0 0" rpy = "0 0 0"/>
+      <geometry>
+        <box size = "0.02 0.086 0.069359"/>
+      </geometry>
+    </visual>
+  </link>
+
   <!-- rear left wheel joint-->
   <joint name="${prefix}rear_left_wheel_joint" type="continuous">
     <parent link="${prefix}base_link"/>
@@ -163,6 +213,29 @@
     <parent link="${prefix}base_link"/>
     <child link="${prefix}laser"/>
     <origin xyz = "0.01435 0 0.176" rpy = "0 0 0"/>
+  </joint>
+
+  <!-- Camera Servo Joint-->
+  <joint name="${prefix}camera_servo_joint" type="continuous">
+    <parent link="${prefix}base_link"/>
+    <child link="${prefix}camera_servo"/>
+    <origin xyz = "0.098162 -0.0035 0.110597" rpy = "${3*PI/2} 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit effort="100" velocity="1.0"/>
+  </joint>
+
+  <!-- Camera Joint -->
+  <joint name="${prefix}camera_joint" type="fixed">
+    <parent link="${prefix}camera_servo"/>
+    <child link="${prefix}camera"/>
+    <origin xyz = "0.006875 -0.018448 -0.0125" rpy = "0 ${PI/2} 0"/>
+  </joint>
+
+  <!-- Gripper Joint -->
+  <joint name="${prefix}gripper_joint" type="fixed">
+    <parent link="${prefix}base_link"/>
+    <child link="${prefix}gripper"/>
+    <origin xyz = "0.15955 0 0.0049" rpy = "0 0 0"/>
   </joint>
   </xacro:macro>
 
