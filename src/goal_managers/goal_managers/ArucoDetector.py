@@ -29,11 +29,10 @@ class ArucoDetector(Node):
 
         self.camera_command_sub = self.create_subscription(String, "/camera_command", self.command_callback, 10)
 
-        self.image_publisher = self.create_publisher(Image, '/camera/package_pose/debug_image', 10)
         self.servo_publisher = self.create_publisher(UInt8, "/servo_cmd", 10)
-        self.pose_publisher = self.create_publisher(PoseStamped, '/camera/package_pose', 10)
+        self.pose_publisher = self.create_publisher(PoseStamped, '/detected_dock_pose', 10)
 
-        self.camera_timer = self.create_timer(0.5, self.camera_timer_callback)
+        self.camera_timer = self.create_timer(1/20, self.camera_timer_callback)
 
         fs = cv2.FileStorage("/home/arubot/pi_cam_calib.yaml", cv2.FILE_STORAGE_READ)
         self.camera_matrix = fs.getNode("K").mat()
@@ -79,11 +78,13 @@ class ArucoDetector(Node):
         self.MAX_TRIES = 3
         self.Tries = self.MAX_TRIES
 
+        self.servo_angle = 0
+
     def command_callback(self, msg: String):
         if (msg.data == "track"):
             self.picam2.start()
             time.sleep(0.5)
-            self.servo_publisher.publish(UInt8(data = 20))
+                
             self.tracking = True
 
     def camera_timer_callback(self):
@@ -92,16 +93,13 @@ class ArucoDetector(Node):
             self.get_package_pose_callback(frame)
 
     def get_package_pose_callback(self, frame):
-        self.get_logger().info("Camera package pose requested")
 
         try:
             frame = cv2.rotate(frame, cv2.ROTATE_180)
-            debug_frame = frame.copy()
 
             corners, ids, _ = self.aruco.detectMarkers(frame, self.dictionary, parameters=self.params)
 
             if ids is not None:
-                self.get_logger().warn(f"No Target ArUco marker detected stopping tracking trying again:")
                 # Keep only markers whose ID equals TARGET_ID
                 mask = (ids.flatten() == self.Target_ID)
                 corners = [corner for corner, keep in zip(corners, mask) if keep]
@@ -109,9 +107,9 @@ class ArucoDetector(Node):
 
             if ids is None:
                 if self.Tries > 0:
-                    self.get_logger().warn(f"No Target ArUco marker detected stopping tracking trying again resetting angle to 30 degrees to try again {ids}")
-                    self.servo_publisher.publish(UInt8(data = 30))
-                    self.publish_debug_image(debug_frame)
+                    self.servo_angle += 1
+                    self.get_logger().warn(f"No Target ArUco marker detected stopping tracking trying again resetting angle to {self.servo_angle} degrees to try again {ids}")
+                    self.servo_publisher.publish(UInt8(data = int(abs(self.servo_angle))))
                     self.Tries -= 1
                 else:
                     self.get_logger().warn("Finished Tracking")
@@ -120,9 +118,6 @@ class ArucoDetector(Node):
             
             if (self.Tries!=self.MAX_TRIES):
                 self.Tries = self.MAX_TRIES
-
-            self.aruco.drawDetectedMarkers(debug_frame, corners, ids)
-
             top_candidates = []
             front_candidates = []
 
@@ -135,8 +130,6 @@ class ArucoDetector(Node):
                 if not success:
                     self.get_logger().warn(f"solvePnP failed for ID {int(marker_id)}")
                     continue
-
-                cv2.drawFrameAxes(debug_frame, self.camera_matrix, self.dist_coeffs, rvec, tvec, MARKER_SIZE * 0.75)
 
                 rotation_matrix, _ = cv2.Rodrigues(rvec)
                 normal_camera = rotation_matrix @ np.array([0.0, 0.0, 1.0], dtype=np.float64)
@@ -159,20 +152,10 @@ class ArucoDetector(Node):
                 ny = float(normal_base_msg.vector.y)
                 nz = float(normal_base_msg.vector.z)
 
-                self.get_logger().info(f"Detected ID {int(marker_id)} | Area={area:.1f} px^2 | Normal=({nx:.2f}, {ny:.2f}, {nz:.2f})")
-
-                center = np.mean(image_points, axis=0).astype(int)
-
                 if abs(nz) > 0.85:
-                    label = "TOP"
-                    color = (0, 255, 0)
                     top_candidates.append({"T": self.pnp_to_transform(rvec, tvec), "area": area, "tvec": tvec, "rvec": rvec})
                 else:
-                    label = "FRONT"
-                    color = (255, 0, 0)
                     front_candidates.append({"T": self.pnp_to_transform(rvec, tvec), "area": area, "tvec": tvec, "rvec": rvec})
-
-                cv2.putText(debug_frame, f"{label} ID {int(marker_id)}", (center[0] + 10, center[1] - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2, cv2.LINE_AA)
 
             T_camera_front = None
             T_camera_top = None
@@ -200,8 +183,6 @@ class ArucoDetector(Node):
             elif T_camera_top is not None:
                 T_output = T_camera_top
                 self.servo_publisher.publish(UInt8(data = self.calculate_servo_angle(T_camera_top[:3, 3])))
-            
-            self.publish_debug_image(debug_frame)
 
             if T_output is None:
                 self.get_logger().warn("Could not determine package pose")
@@ -234,7 +215,7 @@ class ArucoDetector(Node):
             response_base.pose.position.z = float(T_base_target[2, 3])
 
             q = self.rotation_matrix_to_quaternion(T_base_target[:3, :3])
-
+            #q = [0, 0, 0, 1]
             response_base.pose.orientation.x = float(q[0])
             response_base.pose.orientation.y = float(q[1])
             response_base.pose.orientation.z = float(q[2])
@@ -245,26 +226,14 @@ class ArucoDetector(Node):
         except Exception as e:
             self.tracking = False
             self.servo_publisher.publish(UInt8(data = 0))
+            self.servo_angle = 0
             try:
                 self.picam2.stop()  
             except Exception:
                 pass
             
             self.get_logger().error(f"Camera/Aruco error: {str(e)}")
-            return 
-
-    def publish_debug_image(self, frame):
-        msg = Image()
-        msg.header.stamp = self.get_clock().now().to_msg()
-        msg.header.frame_id = "camera"
-        msg.height = frame.shape[0]
-        msg.width = frame.shape[1]
-        msg.encoding = "rgb8"
-        msg.is_bigendian = 0
-        msg.step = frame.shape[1] * 3
-        msg.data = frame.tobytes()
-        self.image_publisher.publish(msg)
-
+            return
     def pnp_to_transform(self, rvec, tvec):
         R, _ = cv2.Rodrigues(rvec)
         T = np.eye(4, dtype=np.float64)
@@ -335,7 +304,7 @@ class ArucoDetector(Node):
             transform = self.tf_buffer.lookup_transform("base_link", "camera", rclpy.time.Time())
 
             target_base = do_transform_point(target_msg, transform)
-
+            
         except Exception as e:
             self.get_logger().warn(
                 f"Could not transform target to base_link: {e}"
@@ -352,6 +321,7 @@ class ArucoDetector(Node):
 
         
         angle_deg = max(0.0, min(85.0, angle_deg))
+        self.servo_angle = angle_deg
 
         return int(round(angle_deg))
 
@@ -382,8 +352,6 @@ class ArucoDetector(Node):
         ]
 
         return T
-
-
 
 
 def main(args=None):

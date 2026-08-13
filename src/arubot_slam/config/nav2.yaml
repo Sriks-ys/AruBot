@@ -67,7 +67,7 @@ bt_navigator:
 
 controller_server:
   ros__parameters:
-    controller_frequency: 20.0
+    controller_frequency: 10.0
     costmap_update_timeout: 0.30
 
     min_x_velocity_threshold: 0.001
@@ -86,12 +86,12 @@ controller_server:
 
     progress_checker:
       plugin: "nav2_controller::SimpleProgressChecker"
-      required_movement_radius: 0.5
+      required_movement_radius: 0.2
       movement_time_allowance: 25.0
 
     general_goal_checker:
       plugin: "nav2_controller::SimpleGoalChecker"
-      xy_goal_tolerance: 0.1
+      xy_goal_tolerance: 0.2
       yaw_goal_tolerance: 0.25
       stateful: true
 
@@ -112,23 +112,21 @@ controller_server:
       min_speed_xy: 0.0
       max_speed_xy: 0.15
 
-      min_speed_theta: -1.4
+      min_speed_theta: 0.3
 
       # Acceleration limits
-      acc_lim_x: 2.0
-      acc_lim_y: 2.0
-      acc_lim_theta: 2.0
+      acc_lim_x: 3.0
+      acc_lim_y: 3.0
+      acc_lim_theta: 4.0
 
-      decel_lim_x: -2.0
-      decel_lim_y: -2.0
-      decel_lim_theta: -2.0
+      decel_lim_x: -3.0
+      decel_lim_y: -3.0
+      decel_lim_theta: -4.0
 
       # Sampling
       vx_samples: 10
       vy_samples: 10
-      vtheta_samples: 20
-
-      sim_time: 1.0
+      vtheta_samples: 10
 
       linear_granularity: 0.05
       angular_granularity: 0.025
@@ -144,23 +142,24 @@ controller_server:
         - PathAlign
         - PathDist
         - GoalDist
+        - RotateToGoal
 
       BaseObstacle.scale: 0.02
 
-      PathAlign.scale: 3.5
+      PathAlign.scale: 7.5
       PathAlign.forward_point_distance: 0.325
 
-      PathDist.scale: 4.0
+      PathDist.scale: 5.0
 
       GoalAlign.scale: 10.0
       GoalAlign.forward_point_distance: 0.325
 
       GoalDist.scale: 9.5
 
-      RotateToGoal.scale: 1.0
-      RotateToGoal.xy_goal_tolerance: 0.1
-      RotateToGoal.path_lenght_tolerance: 0.15
-      RotateToGoal.slowing_factor: -1.0
+      RotateToGoal.scale: 3.0
+      RotateToGoal.xy_goal_tolerance: 0.2
+      RotateToGoal.path_length_tolerance: 0.15
+      RotateToGoal.slowing_factor: 2.0
       RotateToGoal.lookahead_time: 1.0
       RotateToGoal.trans_stopped_velocity: 0.09
 
@@ -383,57 +382,59 @@ collision_monitor:
 
 docking_server:
   ros__parameters:
-    controller_frequency: 50.0
-    initial_perception_timeout: 5.0
-    wait_charge_timeout: 5.0
-    dock_approach_timeout: 30.0
-    undock_linear_tolerance: 0.05
-    undock_angular_tolerance: 0.1
-    max_retries: 3
+    controller_frequency: 10.0
+    initial_perception_timeout: 15.0
+    wait_charge_timeout: 30.0
+    dock_approach_timeout: 60.0
+    undock_linear_tolerance: 0.1
+    undock_angular_tolerance: 0.15
+    max_retries: 5
     base_frame: "base_link"
-    fixed_frame: "odom"
+    fixed_frame: "map"
     dock_backwards: false
     dock_prestaging_tolerance: 0.5
     enable_stamped_cmd_vel: True
 
     # Types of docks
-    dock_plugins: ['simple_charging_dock']
-    simple_charging_dock:
-      plugin: 'opennav_docking::SimpleChargingDock'
-      docking_threshold: 0.05
+    dock_plugins: ['simple_noncharging_dock']
+    simple_noncharging_dock:
+      plugin: 'opennav_docking::SimpleNonChargingDock'
+      docking_threshold: 0.1
       staging_x_offset: -0.7
       use_external_detection_pose: true
       use_battery_status: false # true
       use_stall_detection: false # true
 
-      external_detection_timeout: 1.0
-      external_detection_translation_x: -0.18
+      external_detection_timeout: 2.0
+      external_detection_translation_x: -0.15955
       external_detection_translation_y: 0.0
-      external_detection_rotation_roll: -1.57
-      external_detection_rotation_pitch: -1.57
+      external_detection_rotation_roll: 0.0
+      external_detection_rotation_pitch: 1.57
       external_detection_rotation_yaw: 0.0
       filter_coef: 0.1
 
-    # Dock instances
-    # The following example illustrates configuring dock instances.
-    # docks: ['home_dock']  # Input your docks here
-    # home_dock:
-    #   type: 'simple_charging_dock'
-    #   frame: map
-    #   pose: [0.0, 0.0, 0.0]
-
     controller:
-      k_phi: 3.0
-      k_delta: 2.0
-      v_linear_min: 0.15
-      v_linear_max: 0.15
-      use_collision_detection: true
+      k_phi: 5.0
+      k_delta: 0.5
+
+      v_linear_min: 0.5
+      v_linear_max: 0.8
+      v_angular_min: 0.1
+      v_angular_max: 0.25
+
+      beta: 0.8
+      lambda: 1
+
+      deceleration_max: 0.15
+      use_collision_detection: false
       costmap_topic: "local_costmap/costmap_raw"
       footprint_topic: "local_costmap/published_footprint"
+
       transform_tolerance: 0.1
       projection_time: 5.0
       simulation_step: 0.1
-      dock_collision_threshold: 0.3
+
+      dock_collision_threshold: 0.0
 
 loopback_simulator:
   ros__parameters:
