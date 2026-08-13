@@ -31,9 +31,10 @@ class ArucoDetector(Node):
 
         self.servo_publisher = self.create_publisher(UInt8, "/servo_cmd", 10)
         self.pose_publisher = self.create_publisher(PoseStamped, '/detected_dock_pose', 10)
+        self.goal_manager_ack = self.create_publisher(UInt8, "/cam_feedback", 10)
 
         self.camera_timer = self.create_timer(1/20, self.camera_timer_callback)
-
+        
         fs = cv2.FileStorage("/home/arubot/pi_cam_calib.yaml", cv2.FILE_STORAGE_READ)
         self.camera_matrix = fs.getNode("K").mat()
         self.dist_coeffs = fs.getNode("D").mat()
@@ -75,17 +76,25 @@ class ArucoDetector(Node):
 
         self.Target_ID = self.get_parameter('target_id').value
         self.tracking = False
-        self.MAX_TRIES = 3
-        self.Tries = self.MAX_TRIES
 
         self.servo_angle = 0
+
+        self.ack_sent = False
 
     def command_callback(self, msg: String):
         if (msg.data == "track"):
             self.picam2.start()
-            time.sleep(0.5)
-                
             self.tracking = True
+            time.sleep(0.5)
+            self.get_logger().info("Aruco Tracking Mode")
+
+        elif (msg.data == "stop_tracking"):
+            self.tracking = False
+            self.picam2.stop()
+            self.get_logger().info("Stopping Tracking")
+            if self.ack_sent:
+                self.ack_sent = False
+                
 
     def camera_timer_callback(self):
         if self.tracking:
@@ -93,7 +102,6 @@ class ArucoDetector(Node):
             self.get_package_pose_callback(frame)
 
     def get_package_pose_callback(self, frame):
-
         try:
             frame = cv2.rotate(frame, cv2.ROTATE_180)
 
@@ -106,18 +114,11 @@ class ArucoDetector(Node):
                 ids = ids[mask]
 
             if ids is None:
-                if self.Tries > 0:
-                    self.servo_angle += 1
-                    self.get_logger().warn(f"No Target ArUco marker detected stopping tracking trying again resetting angle to {self.servo_angle} degrees to try again {ids}")
-                    self.servo_publisher.publish(UInt8(data = int(abs(self.servo_angle))))
-                    self.Tries -= 1
-                else:
-                    self.get_logger().warn("Finished Tracking")
-                    self.tracking = False
+                self.servo_angle -= 1
+                self.get_logger().warn(f"No Target ArUco marker detected stopping tracking trying again resetting angle to {self.servo_angle} degrees to try again {ids}")
+                self.servo_publisher.publish(UInt8(data = int(abs(self.servo_angle))))
                 return
             
-            if (self.Tries!=self.MAX_TRIES):
-                self.Tries = self.MAX_TRIES
             top_candidates = []
             front_candidates = []
 
@@ -223,8 +224,11 @@ class ArucoDetector(Node):
 
             self.pose_publisher.publish(response_base)
 
+            if not self.ack_sent:
+                self.goal_manager_ack.publish(UInt8(data = 0))
+                self.ack_sent = True
+
         except Exception as e:
-            self.tracking = False
             self.servo_publisher.publish(UInt8(data = 0))
             self.servo_angle = 0
             try:

@@ -74,6 +74,12 @@ def generate_launch_description():
         ]
     )
 
+    controller_node = Node(
+        package = "goal_managers",
+        executable = "retreat_node",
+        name = "retreater",
+    )
+
 
     delayed_mecanum = TimerAction(
         period=5.0,
@@ -89,5 +95,6 @@ def generate_launch_description():
         package_arguement,
         sllidar_launch,
         delayed_mecanum,
-        delayed_relay
+        delayed_relay, 
+        controller_node
     ])
