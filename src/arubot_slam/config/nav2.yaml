@@ -397,6 +397,7 @@ docking_server:
 
     # Types of docks
     dock_plugins: ['simple_noncharging_dock']
+
     simple_noncharging_dock:
       plugin: 'opennav_docking::SimpleNonChargingDock'
       docking_threshold: 0.01
@@ -412,7 +413,7 @@ docking_server:
       external_detection_rotation_pitch: 1.57
       external_detection_rotation_yaw: 0.0
       filter_coef: 0.1
-
+    
     controller:
       k_phi: 6.5
       k_delta: 4.5
@@ -436,7 +437,6 @@ docking_server:
       projection_time: 5.0
       simulation_step: 0.1
 
-      dock_collision_threshold: 0.0
 
 loopback_simulator:
   ros__parameters:

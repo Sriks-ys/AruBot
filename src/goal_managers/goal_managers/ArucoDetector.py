@@ -82,7 +82,8 @@ class ArucoDetector(Node):
         self.ack_sent = False
 
     def command_callback(self, msg: String):
-        if (msg.data == "track"):
+        if (msg.data[0] == "0"):
+            self.Target_ID = int(msg.data[2:])
             self.picam2.start()
             self.tracking = True
             time.sleep(0.5)

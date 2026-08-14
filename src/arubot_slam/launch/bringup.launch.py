@@ -80,6 +80,12 @@ def generate_launch_description():
         name = "retreater",
     )
 
+    door_node = Node(
+        package = "network",
+        executable = "door_client",
+        name = "door_client"
+    )
+
 
     delayed_mecanum = TimerAction(
         period=5.0,
@@ -88,7 +94,7 @@ def generate_launch_description():
 
     delayed_relay = TimerAction(
         period=11.0,
-        actions=[tf_odometry_relay_node, network_mqtt, goal_manager]
+        actions=[tf_odometry_relay_node, network_mqtt, goal_manager, door_node]
     )
 
     return LaunchDescription([

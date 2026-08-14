@@ -27,7 +27,6 @@ setup(
             "goal_manager = goal_managers.GoalManager:main",
             "aruco_detector = goal_managers.ArucoDetector:main",
             "retreat_node = goal_managers.retreat_node:main",
-            'door_client = goal_managers.door_client:main',
         ],
     },
 )
