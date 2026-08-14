@@ -75,9 +75,8 @@ class ServoHardwareController : public rclcpp::Node {
                 RCLCPP_ERROR(this->get_logger(), "Failed to write to servo: %s", strerror(errno));
             }
 
-            if (msg->data <= 180){
-                camera_angle = msg->data;
-            }
+            
+            camera_angle = msg->data;
         }
 
         sensor_msgs::msg::JointState make_state(int angle){

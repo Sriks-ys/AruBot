@@ -6,6 +6,7 @@ from nav2_msgs.action import NavigateToPose, DockRobot
 from action_msgs.msg import GoalStatus
 from lifecycle_msgs.srv import GetState
 from std_msgs.msg import String, UInt8
+from control_msgs.msg import DynamicInterfaceGroupValues
 
 class GoalManager(Node):
     def __init__(self):
@@ -13,15 +14,19 @@ class GoalManager(Node):
 
         
         self.stage_id = 0
-        self.STAGES = ["INIT", "NEXT_PACKAGE", "COLLECT_PACKAGE", "SOUND RETREAT", "READY PAST OBSTACLE", "BEFORE DOOR", "CORRIDOR", "BEFORE DOOR 2", "RECIEPIENT"]
+        self.STAGES = ["INIT", "NEXT_PACKAGE", "COLLECT_PACKAGE", "SOUND RETREAT", "READY PAST OBSTACLE", "BEFORE DOOR", "OPEN DOOR","CORRIDOR", "BEFORE DOOR 2", "RECIEPIENT"]
         self.STAGE = self.STAGES[self.stage_id]
 
         self.drone_package_sub = self.create_subscription(Point, '/package_from_drone', self.drone_location_callback, 10)
         self.camera_sub = self.create_subscription(UInt8, "/cam_feedback", self.camera_callback, 10)
         self.controller_sub = self.create_subscription(UInt8, "/controller_feedback", self.controller_feedback, 10)
+        self.gpio_sub = self.create_subscription(DynamicInterfaceGroupValues, "/gpio_command_controller/gpio_states", self.gpio_callback, 1)
+        self.door_sub = self.create_subscription(UInt8, "/door_feedback", self.door_feedback, 10)
 
         self.camera_command_pub = self.create_publisher(String, "/camera_command", 10)
         self.controller_cmd_pub = self.create_publisher(String, "/controller_cmd", 10)
+        self.servo_cmd_pub = self.create_publisher(UInt8, '/servo_cmd', 10)
+        self.door_cmd_pub = self.create_publisher(String, "/door_cmd", 10)
 
         self.nav_client = ActionClient(self, NavigateToPose, '/navigate_to_pose')
         self.dock_client = ActionClient(self, DockRobot, '/dock_robot')
@@ -45,8 +50,11 @@ class GoalManager(Node):
         
         self.package_staging_pose = None
 
-        self.WARE_HOUSE_CENTER = (0.37, 3.01, 0.0)
-        self.PAST_OBSTACLES = (3.56, 3.64, 0.0)
+        self.WARE_HOUSE_CENTER = (0.53, 2.5, 0.0)
+        self.PAST_OBSTACLES = (5.45, 2.32, 0.0)
+        self.IN_CORRIDOR = (9.04, 1.75, 0.0)
+        self.BEFORE_DOOR_2 = (9.34, -2.22, 0.0)
+
 
     def main_thread(self):
         if self.STAGE == "INIT":
@@ -66,8 +74,9 @@ class GoalManager(Node):
         elif self.STAGE == "COLLECT_PACKAGE":
             self.get_logger().info("Collecting Package")
             # Add later
-            self.stage_id += 1
-            self.STAGE = self.STAGES[self.stage_id]
+            if not self.state_command_initiated:
+                self.servo_cmd_pub.publish(UInt8(data = 200))
+                self.state_command_initiated = True
 
         elif self.STAGE == "SOUND RETREAT":
             self.get_logger().info("Going Back")
@@ -88,6 +97,28 @@ class GoalManager(Node):
                 self.send_nav2_goal(*self.PAST_OBSTACLES)
                 self.last_goal = self.PAST_OBSTACLES
                 self.state_command_initiated = True
+        
+        elif self.STAGE == "OPEN DOOR":
+            self.get_logger().info("Opening door")
+            if not self.state_command_initiated:
+                self.door_cmd_pub.publish(String(data = "OPEN"))
+                self.state_command_initiated = True
+                self.get_logger().info("SENDING OPEN CMD")
+
+        elif self.STAGE == "CORRIDOR":
+            self.get_logger().info("Travelling to cooridor")
+            if not self.state_command_initiated:
+                self.send_nav2_goal(*self.IN_CORRIDOR)
+                self.last_goal = self.IN_CORRIDOR
+                self.state_command_initiated = True
+
+        elif self.STAGE == "BEFORE DOOR 2":
+            self.get_logger().info("Tranvelling to front of 2nd Door")
+            if not self.state_command_initiated:
+                self.send_nav2_goal(*self.BEFORE_DOOR_2)
+                self.last_goal = self.BEFORE_DOOR_2
+                self.state_command_initiated = True
+
 
     def camera_callback(self, msg: UInt8):
         if (msg.data == 0):
@@ -101,6 +132,21 @@ class GoalManager(Node):
             self.STAGE = self.STAGES[self.stage_id]
             self.state_command_initiated = False
             self.get_logger().info(f"Reached Stage {self.STAGE}")
+
+    def gpio_callback(self, msg: DynamicInterfaceGroupValues):
+        if self.STAGE == "COLLECT_PACKAGE":
+            if msg.interface_values[0].values[0] == 1.0 and self.state_command_initiated:
+                self.stage_id += 1
+                self.STAGE = self.STAGES[self.stage_id]
+                self.get_logger().info("Package Collected")
+                self.state_command_initiated = False
+
+    def door_feedback(self, msg: UInt8):
+        if msg.data == 0 and self.STAGE == "OPEN DOOR":
+            self.stage_id += 1
+            self.STAGE = self.STAGES[self.stage_id]
+            self.state_command_initiated = False
+            self.get_logger().info("DOOR IS OPEN")
     
     def drone_location_callback(self, msg: Point):
         self.drone_package_location = (msg.x, msg.y)
